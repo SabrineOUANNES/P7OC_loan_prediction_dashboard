@@ -7,9 +7,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import shap
-import pickle
-from lightgbm import LGBMClassifier
-from sklearn.preprocessing import StandardScaler
 import time
 
 url = 'http://127.0.0.1:5000/api/'
@@ -85,15 +82,16 @@ if customer:
                     content = json.loads(res.content)
                     expec_value = content['expec_value']
                     shap_value = content['shap_arr']
+                    print(type(shap_value))
                     applicant_customer = content['client']
+                    print(type(applicant_customer))
                     features = content['feature_names']
-                    st.write(expec_value)
                     st.write(applicant_customer)
-                    st.write(features)
+                    st.write(shap_value)
                     shap.initjs()
                     shap.force_plot(
                         float(expec_value),
-                        shap_value,
+                        np.array(shap_value),
                         applicant_customer,
                         feature_names=features
                     )
