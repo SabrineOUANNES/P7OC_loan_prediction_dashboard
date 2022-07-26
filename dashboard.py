@@ -1,11 +1,8 @@
-import streamlit as st
 from PIL import Image
 import requests as re
 import json
-import seaborn as sns
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import time
 from sklearn.preprocessing import StandardScaler
 from functions import *
