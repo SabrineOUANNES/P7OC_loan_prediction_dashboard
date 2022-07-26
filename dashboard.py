@@ -6,12 +6,17 @@ import seaborn as sns
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import shap
 import time
+from sklearn.preprocessing import StandardScaler
+from functions import *
 
-url = 'http://127.0.0.1:5000/api/'
-st.title('Loan prediction dashboard')
+# local address server
+#url = 'http://127.0.0.1:5000/api/'
+# Online address server
+url = 'https://loan-prediction-oc7.herokuapp.com/api/'
+st.title('Loan Prediction Dashboard')
 st.markdown("Creator : **_Sabrine OUANNES_**")
+st.markdown("Customer : **_Prêt à dépenser_**")
 logo = Image.open('assets/logo.JPG')
 st.sidebar.image(logo, width=250)
 customer_id = st.sidebar.text_input("Customer_ID")
@@ -39,17 +44,16 @@ if customer:
         st.pyplot(fig)
 
         if content['prediction'] == '0':
-            # st.write('Decision : Loan accepted')
-            st.markdown(f'<h1 style="color:green;font-size:24px;">{"Decision : Loan accepted"}</h1>',
+            st.markdown(f'<h1 style="color:green;font-size:24px;">{"Decision : Loan granted"}</h1>',
                         unsafe_allow_html=True)
-            happy = Image.open(('assets/happy_emoji.png'))
+            happy = Image.open('assets/happy_emoji.jpg')
             st.image(happy, width=20)
 
         else:
             # st.write('Decision : Loan refused')
             st.markdown(f'<h1 style="color:red;font-size:24px;">{"Decision : Loan refused"}</h1>',
                         unsafe_allow_html=True)
-            sad = Image.open(('assets/sad_emoji.png'))
+            sad = Image.open('assets/sad_emoji.png')
             st.image(sad, width=50)
         explanation_lime = st.checkbox('Show explanation lime')
         if explanation_lime:
@@ -76,26 +80,7 @@ if customer:
                     st.write(cust_df[Feat_to_show].T)
                 else:
                     st.table(cust_df.T)
-                shap_explanation = st.checkbox('Show shap explanation')
-                if shap_explanation:
-                    res = re.get(url + 'shap/' + str(customer_id))
-                    content = json.loads(res.content)
-                    expec_value = content['expec_value']
-                    shap_value = content['shap_arr']
-                    print(type(shap_value))
-                    applicant_customer = content['client']
-                    print(type(applicant_customer))
-                    features = content['feature_names']
-                    st.write(applicant_customer)
-                    st.write(shap_value)
-                    shap.initjs()
-                    shap.force_plot(
-                        float(expec_value),
-                        np.array(shap_value),
-                        applicant_customer,
-                        feature_names=features
-                    )
-                    st.pyplot()
+
 
 
 elif model:
@@ -119,7 +104,7 @@ elif model:
         st.write("You have selected the ", num_feat, "features most important for the model")
         fig, ax = plt.subplots()
         bar_data = feature_imp.iloc[:num_feat]
-        ax.barh(bar_data['Feature'], bar_data['Value'])
+        sns.barplot(x="Value", y="Feature", data=bar_data)
         st.pyplot(fig)
         feat_description = st.checkbox("Show features description")
         if feat_description:
@@ -136,63 +121,39 @@ elif comparison:
     all_features = content["Features"]
     all_data = pd.DataFrame(np.array(list(content['other_customers']), dtype=float), columns=all_features)
     client = pd.DataFrame(np.array(list(content['customer_data']), dtype=float), columns=all_features)
-    all_data = pd.DataFrame(data=all_data, columns=all_features)
-    client = pd.DataFrame(data=client, columns=all_features)
-    box_columns = all_data.drop(columns=['TARGET'], axis=1).columns
-    data_melt_all = all_data.melt(id_vars=['TARGET'])#,
-                                  #value_vars=box_columns,
-                                  #var_name="variables",
-                                  #value_name="values")
+    scaler = StandardScaler()
+    data_to_scale = all_data.drop(columns=['TARGET'], axis=1)
+    data_to_scale = pd.DataFrame(data=scaler.fit_transform(data_to_scale), columns=data_to_scale.columns)
+    client_without_target = client.drop(columns=['TARGET'], axis=1)
+    client_without_target = pd.DataFrame(data=scaler.transform(client_without_target),
+                                         columns=data_to_scale.columns)
+    all_data = pd.concat([data_to_scale, all_data['TARGET']], axis=1)
+    all_data['TARGET'].replace({0.0: 'REPAID', 1.0: 'NOT REPAID'}, inplace=True)
+    client = pd.concat([client_without_target, client['TARGET']], axis=1)
+    data_melt_all = all_data.melt(id_vars=['TARGET'])
+    dist_columns = all_data.drop(columns=['TARGET'], axis=1).columns
 
     with st.spinner('Wait for it...'):
         time.sleep(5)
     st.success('Boxplot shown!')
-    feat_to_show = st.multiselect('Which feature do you want to show?', all_features)
+    feat_to_show = st.multiselect('Which feature do you want to show?', dist_columns)
     if feat_to_show:
         select_data = all_data[feat_to_show]
         select_data = pd.concat([select_data, all_data['TARGET']], axis=1)
         data_select_melt = select_data.melt(id_vars=['TARGET'])
-        fig, ax = plt.subplots()
-        ax = sns.boxplot(data=data_select_melt, x="value", y="variable", hue='TARGET')
-        plt.xticks(rotation=75, size=7)
-        ax = sns.swarmplot(data=client[feat_to_show], color='r',
-                           marker='o', size=5, edgecolor='k', label='applicant customer', ax=ax)
-        handles, labels = ax.get_legend_handles_labels()
-        ax.legend(handles[:1], labels[:1], loc='lower right', fontsize=5)
-        st.pyplot(fig)
+
+        get_boxplot_comparison(data_select_melt, client, feat_to_show)
+
         hist_show = st.checkbox('Show distribution features')
         if hist_show:
-            fig = plt.figure(figsize=(8, 30))
-            for i, label in enumerate(select_data.columns):
-                plt.subplot(11, 2, i + 1)
-                sns.histplot(select_data[label])
-                plt.yticks(size=5)
-                plt.ylabel('Count', size=5)
-                plt.xticks(size=5)
-                plt.xlabel(label, size=5)
-                #plt.vlines(x=client[label], colors='r', ymax=)
-            st.pyplot(fig)
+            get_hist_comparison(feat_to_show, all_data, client)
 
     else:
-        fig, ax = plt.subplots()
-        ax = sns.boxplot(data=data_melt_all, x="value", y="variable", hue='TARGET')
-        plt.xticks(rotation=75, size=7)
-        ax = sns.swarmplot(data=client, color='r',
-                           marker='o', size=5, edgecolor='k', label='applicant customer', ax=ax)
-        handles, labels = ax.get_legend_handles_labels()
-        ax.legend(handles[:1], labels[:1], loc='lower right', fontsize=5)
-        st.pyplot(fig)
+        get_boxplot_comparison(data_melt_all, client, all_features)
+
         hist_show = st.checkbox('Show distribution features')
         if hist_show:
-            fig = plt.figure(figsize=(8, 30))
-            for i, label in enumerate(all_features):
-                plt.subplot(11, 2, i + 1)
-                sns.histplot(all_data[label], edgecolor='none', bins=30)
-                plt.yticks(size=5)
-                plt.ylabel('Count', size=5)
-                plt.xticks(size=5)
-                plt.xlabel(label, size=5)
-                #plt.vlines(x=client[label], colors='r')
-            st.pyplot(fig)
+            get_hist_comparison(dist_columns, all_data, client)
+
 
 
