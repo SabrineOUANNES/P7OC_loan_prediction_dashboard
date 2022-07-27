@@ -1,3 +1,6 @@
+## My first streamlit Project
+[You can reach the application here.](https://sabrineouannes-loan-prediction-dashboard-dashboard-5ksb3q.streamlitapp.com/)
+
 This dashboard is intended for the customer service managers of the frensh financial company "Prêt à dépenser"
 in order to explain the decision to grant the loan to customers in the most 
 transparent way. This dashboard allows you to:
